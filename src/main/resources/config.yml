@@ -7,6 +7,15 @@ timers:
   auto-start-seconds: 120
   hunter-selection-seconds: 10
   game-duration-seconds: 600
+  runner-respawn-seconds: 5
+  respawn-invulnerability-seconds: 2
+
+sudden-death:
+  enabled: true
+  start-seconds: 120
+  reveal-interval-seconds: 20
+  reveal-duration-seconds: 5
+  hunter-speed-amplifier: 1
 
 scales:
   runner: 0.33
@@ -47,6 +56,9 @@ messages:
   you-are-hunter: "&cSei l'Hunter! Caccia tutti i runner."
   now-hunter: "&cSei stato trasformato in Hunter!"
   runner-converted: "&c%player% &eè stato convertito in Hunter."
+  runner-respawn-start: "&6Sei stato preso! Tornerai come Hunter tra &e%seconds%s&6."
+  runner-respawn-broadcast: "&e%player% &6tornerà come Hunter tra &e%seconds%s&6."
+  runner-respawn-complete: "&cSei tornato come Hunter!"
   hunters-win: "&cGli Hunter hanno eliminato tutti i Runner!"
   runners-win: "&aI Runner hanno resistito abbastanza a lungo!"
   manual-stop: "&eLa partita è stata fermata manualmente."
@@ -61,3 +73,11 @@ messages:
   arena-spawn-added: "&aSpawn dell'arena aggiunto."
   game-start-runner: "&aSei un Runner! Sopravvivi agli Hunter."
   player-left: "&e%player% ha lasciato la partita."
+  sudden-death-start: "&cSudden death! I runner saranno rivelati periodicamente."
+  sudden-death-reveal: "&dPing dei runner attivo per &e%seconds%s&d!"
+
+hud:
+  scoreboard-title: "TinyHunt"
+  bossbar-title: "&6Tempo rimanente: &e%time%"
+  extra-match: ""
+  extra-sudden-death: "Sudden death"

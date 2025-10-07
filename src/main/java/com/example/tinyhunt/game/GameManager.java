@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -16,6 +17,8 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
@@ -23,6 +26,8 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 /**
  * Coordinates queue management, game flow, and configuration-backed state.
@@ -37,18 +42,34 @@ public final class GameManager {
     private final LinkedHashSet<UUID> queue = new LinkedHashSet<>();
     private final LinkedHashSet<UUID> activePlayers = new LinkedHashSet<>();
     private final Map<UUID, PlayerRole> roles = new HashMap<>();
+    private final Map<UUID, BukkitTask> pendingConversions = new HashMap<>();
+    private final Map<UUID, GameMode> storedModes = new HashMap<>();
+
+    private final MatchHud matchHud;
 
     private GameState state = GameState.WAITING;
     private BukkitTask countdownTask;
     private int countdownSecondsRemaining;
     private BukkitTask hunterSelectionTask;
     private BukkitTask gameTimerTask;
+    private BukkitTask hudUpdateTask;
+    private long matchStartMillis;
+    private long matchEndMillis;
+    private boolean suddenDeathTriggered;
+    private long nextRevealMillis;
 
     private int minPlayers;
     private int maxPlayers;
     private int autoStartSeconds;
     private int hunterDelaySeconds;
     private int gameDurationSeconds;
+    private int conversionDelaySeconds;
+    private int conversionInvulnerabilitySeconds;
+    private boolean suddenDeathEnabled;
+    private int suddenDeathStartSeconds;
+    private int suddenDeathRevealIntervalSeconds;
+    private int suddenDeathRevealDurationSeconds;
+    private int suddenDeathHunterSpeedAmplifier;
     private float runnerScale;
     private float hunterScale;
     private Attribute cachedScaleAttribute;
@@ -57,6 +78,7 @@ public final class GameManager {
 
     public GameManager(TinyHuntPlugin plugin) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.matchHud = new MatchHud(plugin);
         reloadSettings();
     }
 
@@ -67,6 +89,17 @@ public final class GameManager {
         autoStartSeconds = Math.max(5, plugin.getConfig().getInt("timers.auto-start-seconds", 120));
         hunterDelaySeconds = Math.max(1, plugin.getConfig().getInt("timers.hunter-selection-seconds", 10));
         gameDurationSeconds = Math.max(30, plugin.getConfig().getInt("timers.game-duration-seconds", 600));
+        conversionDelaySeconds = Math.max(1, plugin.getConfig().getInt("timers.runner-respawn-seconds", 5));
+        conversionInvulnerabilitySeconds = Math.max(0,
+                plugin.getConfig().getInt("timers.respawn-invulnerability-seconds", 2));
+        suddenDeathEnabled = plugin.getConfig().getBoolean("sudden-death.enabled", true);
+        suddenDeathStartSeconds = Math.max(10, plugin.getConfig().getInt("sudden-death.start-seconds", 120));
+        suddenDeathRevealIntervalSeconds = Math.max(5,
+                plugin.getConfig().getInt("sudden-death.reveal-interval-seconds", 20));
+        suddenDeathRevealDurationSeconds = Math.max(1,
+                plugin.getConfig().getInt("sudden-death.reveal-duration-seconds", 5));
+        suddenDeathHunterSpeedAmplifier = Math.max(0,
+                plugin.getConfig().getInt("sudden-death.hunter-speed-amplifier", 1));
         runnerScale = (float) plugin.getConfig().getDouble("scales.runner", 0.33D);
         hunterScale = (float) plugin.getConfig().getDouble("scales.hunter", 1.0D);
 
@@ -235,8 +268,14 @@ public final class GameManager {
             }
         }
         broadcastToParticipants(plugin.getMessage("messages.game-start"));
+        suddenDeathTriggered = false;
+        nextRevealMillis = 0L;
+        matchStartMillis = System.currentTimeMillis();
+        matchEndMillis = matchStartMillis + gameDurationSeconds * 1000L;
         scheduleHunterSelection();
         scheduleGameTimer();
+        matchHud.start(activePlayers);
+        startHudUpdates();
     }
 
     private void scheduleHunterSelection() {
@@ -285,18 +324,14 @@ public final class GameManager {
         if (!isParticipant(target)) {
             return;
         }
-        if (isHunter(target)) {
+        if (isHunter(target) || isConverting(target)) {
             return;
         }
-        promoteToHunter(target, false);
-        broadcastToParticipants(plugin.getMessage("messages.runner-converted",
-                Map.of("player", target.getName())));
-        if (getRemainingRunners().isEmpty()) {
-            concludeGame(GameEndReason.HUNTERS_ELIMINATED_ALL);
-        }
+        beginRunnerConversion(target);
     }
 
     public void eliminatePlayer(Player player, boolean silent) {
+        cancelConversion(player.getUniqueId());
         roles.remove(player.getUniqueId());
         activePlayers.remove(player.getUniqueId());
         resetPlayerState(player);
@@ -318,6 +353,7 @@ public final class GameManager {
             broadcastToQueue(plugin.getMessage("messages.countdown-cancelled"));
         }
         if (activePlayers.remove(uuid)) {
+            cancelConversion(uuid);
             roles.remove(uuid);
             if (state == GameState.RUNNING && getRemainingRunners().isEmpty()) {
                 concludeGame(GameEndReason.HUNTERS_ELIMINATED_ALL);
@@ -332,6 +368,11 @@ public final class GameManager {
         cancelCountdown();
         cancelHunterSelection();
         cancelGameTimer();
+        cancelHudUpdates();
+        cancelConversions();
+        matchHud.stop();
+        suddenDeathTriggered = false;
+        nextRevealMillis = 0L;
         state = GameState.ENDING;
         String message = switch (reason) {
             case HUNTERS_ELIMINATED_ALL -> plugin.getMessage("messages.hunters-win");
@@ -386,6 +427,7 @@ public final class GameManager {
     }
 
     private void applyRunnerState(Player player) {
+        restoreGameMode(player);
         applyScale(player, runnerScale);
         player.setHealth(Math.min(player.getHealth(), player.getMaxHealth()));
         player.setFoodLevel(20);
@@ -393,8 +435,10 @@ public final class GameManager {
 
     private void promoteToHunter(Player player, boolean announce) {
         roles.put(player.getUniqueId(), PlayerRole.HUNTER);
+        restoreGameMode(player);
         applyScale(player, hunterScale);
         teleportToArena(player);
+        applyHunterBuffs(player);
         if (announce) {
             player.sendMessage(plugin.getMessage("messages.you-are-hunter"));
         } else {
@@ -404,6 +448,11 @@ public final class GameManager {
 
     private void resetPlayerState(Player player) {
         applyScale(player, 1.0F);
+        restoreGameMode(player);
+        player.setNoDamageTicks(0);
+        for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) {
+            player.removePotionEffect(effect.getType());
+        }
     }
 
     private List<Player> getRemainingRunners() {
@@ -412,6 +461,20 @@ public final class GameManager {
                 .filter(Objects::nonNull)
                 .filter(player -> roles.getOrDefault(player.getUniqueId(), PlayerRole.RUNNER) == PlayerRole.RUNNER)
                 .collect(Collectors.toList());
+    }
+
+    private int getRunnerCount() {
+        return (int) activePlayers.stream()
+                .map(uuid -> roles.getOrDefault(uuid, PlayerRole.RUNNER))
+                .filter(role -> role == PlayerRole.RUNNER)
+                .count();
+    }
+
+    private int getHunterCount() {
+        return (int) activePlayers.stream()
+                .map(uuid -> roles.getOrDefault(uuid, PlayerRole.RUNNER))
+                .filter(role -> role == PlayerRole.HUNTER)
+                .count();
     }
 
     private boolean validateConfiguration() {
@@ -423,6 +486,8 @@ public final class GameManager {
         cancelCountdown();
         cancelHunterSelection();
         cancelGameTimer();
+        cancelHudUpdates();
+        cancelConversions();
     }
 
     private void cancelCountdown() {
@@ -464,6 +529,172 @@ public final class GameManager {
                 player.sendMessage(message);
             }
         }
+    }
+
+    private boolean isConverting(Player player) {
+        return roles.getOrDefault(player.getUniqueId(), PlayerRole.RUNNER) == PlayerRole.CONVERTING;
+    }
+
+    private void beginRunnerConversion(Player player) {
+        UUID uuid = player.getUniqueId();
+        roles.put(uuid, PlayerRole.CONVERTING);
+        storedModes.put(uuid, player.getGameMode());
+        player.setGameMode(GameMode.SPECTATOR);
+        player.sendMessage(plugin.getMessage("messages.runner-respawn-start",
+                Map.of("seconds", conversionDelaySeconds)));
+        broadcastToParticipants(plugin.getMessage("messages.runner-respawn-broadcast",
+                Map.of("player", player.getName(), "seconds", conversionDelaySeconds)));
+        BukkitTask task = new BukkitRunnable() {
+            @Override
+            public void run() {
+                finishRunnerConversion(uuid);
+            }
+        }.runTaskLater(plugin, conversionDelaySeconds * 20L);
+        pendingConversions.put(uuid, task);
+    }
+
+    private void finishRunnerConversion(UUID uuid) {
+        pendingConversions.remove(uuid);
+        if (state != GameState.RUNNING) {
+            return;
+        }
+        Player player = Bukkit.getPlayer(uuid);
+        if (player == null) {
+            return;
+        }
+        roles.put(uuid, PlayerRole.HUNTER);
+        restoreGameMode(player);
+        applyScale(player, hunterScale);
+        teleportToArena(player);
+        if (conversionInvulnerabilitySeconds > 0) {
+            player.setNoDamageTicks(conversionInvulnerabilitySeconds * 20);
+        }
+        applyHunterBuffs(player);
+        player.sendMessage(plugin.getMessage("messages.runner-respawn-complete"));
+        broadcastToParticipants(plugin.getMessage("messages.runner-converted", Map.of("player", player.getName())));
+        if (getRemainingRunners().isEmpty()) {
+            concludeGame(GameEndReason.HUNTERS_ELIMINATED_ALL);
+        }
+    }
+
+    private void cancelConversion(UUID uuid) {
+        BukkitTask task = pendingConversions.remove(uuid);
+        if (task != null) {
+            task.cancel();
+        }
+        storedModes.remove(uuid);
+    }
+
+    private void cancelConversions() {
+        for (BukkitTask task : pendingConversions.values()) {
+            task.cancel();
+        }
+        pendingConversions.clear();
+        storedModes.clear();
+    }
+
+    private void startHudUpdates() {
+        cancelHudUpdates();
+        hudUpdateTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                updateHud();
+            }
+        }.runTaskTimer(plugin, 0L, 20L);
+    }
+
+    private void cancelHudUpdates() {
+        if (hudUpdateTask != null) {
+            hudUpdateTask.cancel();
+            hudUpdateTask = null;
+        }
+    }
+
+    private void updateHud() {
+        if (state != GameState.RUNNING) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        long timeRemainingSeconds = Math.max(0L, (matchEndMillis - now + 999L) / 1000L);
+        if (suddenDeathEnabled && !suddenDeathTriggered && timeRemainingSeconds <= suddenDeathStartSeconds) {
+            triggerSuddenDeath();
+        }
+        long revealSeconds = -1L;
+        if (suddenDeathTriggered) {
+            if (now >= nextRevealMillis) {
+                performSuddenDeathReveal();
+            }
+            revealSeconds = Math.max(0L, (nextRevealMillis - System.currentTimeMillis() + 999L) / 1000L);
+        }
+        matchHud.update(activePlayers, createHudSnapshot(timeRemainingSeconds, revealSeconds));
+    }
+
+    private MatchHud.HudSnapshot createHudSnapshot(long timeRemainingSeconds, long nextRevealSeconds) {
+        String formattedTime = formatDuration(timeRemainingSeconds);
+        String bossBarTemplate = getHudString("hud.bossbar-title", "&6Tempo: &e%time%");
+        String bossBarTitle = ChatColor.stripColor(bossBarTemplate.replace("%time%", formattedTime));
+        String scoreboardTitle = ChatColor.stripColor(getHudString("hud.scoreboard-title", "TinyHunt"));
+        String extraLine = suddenDeathTriggered
+                ? ChatColor.stripColor(getHudString("hud.extra-sudden-death", "Sudden death!"))
+                : ChatColor.stripColor(getHudString("hud.extra-match", ""));
+        double progress = gameDurationSeconds <= 0 ? 0.0D
+                : Math.max(0.0D, Math.min(1.0D, (double) timeRemainingSeconds / gameDurationSeconds));
+        return new MatchHud.HudSnapshot(bossBarTitle, scoreboardTitle, progress, formattedTime, getRunnerCount(),
+                getHunterCount(), nextRevealSeconds, extraLine);
+    }
+
+    private void triggerSuddenDeath() {
+        suddenDeathTriggered = true;
+        broadcastToParticipants(plugin.getMessage("messages.sudden-death-start"));
+        nextRevealMillis = System.currentTimeMillis();
+        for (UUID uuid : activePlayers) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null && roles.getOrDefault(uuid, PlayerRole.RUNNER) == PlayerRole.HUNTER) {
+                applyHunterBuffs(player);
+            }
+        }
+        performSuddenDeathReveal();
+    }
+
+    private void performSuddenDeathReveal() {
+        nextRevealMillis = System.currentTimeMillis() + suddenDeathRevealIntervalSeconds * 1000L;
+        for (Player runner : getRemainingRunners()) {
+            runner.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING,
+                    suddenDeathRevealDurationSeconds * 20, 0, true, false, true));
+        }
+        if (!getRemainingRunners().isEmpty()) {
+            broadcastToParticipants(plugin.getMessage("messages.sudden-death-reveal",
+                    Map.of("seconds", suddenDeathRevealDurationSeconds)));
+        }
+    }
+
+    private void applyHunterBuffs(Player player) {
+        if (!suddenDeathTriggered || suddenDeathHunterSpeedAmplifier <= 0) {
+            return;
+        }
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, suddenDeathRevealIntervalSeconds * 20,
+                suddenDeathHunterSpeedAmplifier - 1, true, false, true));
+    }
+
+    private void restoreGameMode(Player player) {
+        GameMode previous = storedModes.remove(player.getUniqueId());
+        if (previous != null) {
+            player.setGameMode(previous);
+        } else if (player.getGameMode() == GameMode.SPECTATOR) {
+            player.setGameMode(GameMode.SURVIVAL);
+        }
+    }
+
+    private String getHudString(String path, String def) {
+        String value = plugin.getConfig().getString(path, def);
+        return ChatColor.translateAlternateColorCodes('&', value);
+    }
+
+    private String formatDuration(long seconds) {
+        long clamped = Math.max(0, seconds);
+        long minutes = clamped / 60;
+        long remaining = clamped % 60;
+        return String.format(Locale.ROOT, "%02d:%02d", minutes, remaining);
     }
 
     public void saveLobbyCorner(Location location, boolean first) {
