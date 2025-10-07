@@ -16,3 +16,4 @@
 - Il documento `docs/design/tinyhunt-game-design.md` contiene la checklist completa delle feature richieste (ruoli, abilità, power-up, QoL, roadmap). Aggiornalo quando implementi nuove parti del gioco.
 - Mantieni questo file aggiornato con link utili o convenzioni scoperte durante lo sviluppo per velocizzare il lavoro futuro.
 - Il `GameManager` gestisce ora respawn ritardati (stato `CONVERTING`), la Sudden Death (ping glowing + speed ai cacciatori) e l'HUD condiviso (`MatchHud` con scoreboard e bossbar). Consulta `config.yml` per i nuovi parametri (`timers.runner-respawn-*`, sezione `sudden-death`, sezione `hud`).
+- Target API aggiornato a Paper 1.21.x (testato su 1.21.8); assicurati che le dipendenze Maven e `plugin.yml` restino allineati.

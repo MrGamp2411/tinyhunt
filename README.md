@@ -1,6 +1,6 @@
 # TinyHunt
 
-TinyHunt è un plugin Paper per Minecraft 1.20 che introduce un minigioco Hunter vs Runner completamente gestito via comandi e configurazione. I giocatori si mettono in coda, vengono teletrasportati in arena e un hunter viene scelto casualmente dopo pochi secondi: se tutti i runner vengono convertiti gli hunter vincono, altrimenti vincono i runner resistendo fino allo scadere del tempo di gioco.
+TinyHunt è un plugin Paper per Minecraft 1.21 che introduce un minigioco Hunter vs Runner completamente gestito via comandi e configurazione. I giocatori si mettono in coda, vengono teletrasportati in arena e un hunter viene scelto casualmente dopo pochi secondi: se tutti i runner vengono convertiti gli hunter vincono, altrimenti vincono i runner resistendo fino allo scadere del tempo di gioco.
 
 ## Funzionalità principali
 - Coda automatica con avvio del match quando viene raggiunto il numero minimo di giocatori configurato.
@@ -14,7 +14,7 @@ TinyHunt è un plugin Paper per Minecraft 1.20 che introduce un minigioco Hunter
 Per una lista completa delle feature pianificate (inclusi ruoli avanzati, abilità, power-up, statistiche e strumenti amministrativi) fai riferimento alla [TinyHunt Game Design Specification](docs/design/tinyhunt-game-design.md). Il documento funge da checklist ufficiale: ogni sezione corrisponde a un blocco di sviluppo e indica anche le dipendenze tecniche suggerite.
 
 ## Requisiti
-- Server Paper o compatibile con API 1.20.
+- Server Paper o compatibile con API 1.21 (testato fino alla build 1.21.8).
 - Permessi Bukkit per gestire i comandi (`tinyhunt.play`, `tinyhunt.admin`).
 
 ## Installazione rapida

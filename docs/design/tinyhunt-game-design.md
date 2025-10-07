@@ -100,7 +100,7 @@ Questo documento riassume e dettaglia tutte le meccaniche previste per la versio
 - Comandi rapidi per forzare mappa, settare spawn, ricaricare config live.
 
 ## 11. Scelta tecnica per il ridimensionamento dei fuggitivi
-- Opzione `attribute` (Minecraft 1.20.5+): usa l'attributo `generic.scale`.
+- Opzione `attribute` (Minecraft 1.20.5+ / 1.21.x): usa l'attributo `generic.scale`.
 - Opzione `disguise`: integra LibsDisguises per trasformare i fuggitivi in baby-mob.
 - Opzione `visual`: gestita via ProtocolLib con sola modifica estetica.
 - Config `scaleMode` che consente di cambiare approccio senza refactor.
