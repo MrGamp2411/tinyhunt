@@ -9,6 +9,8 @@ TinyHunt è un plugin Paper per Minecraft 1.20 che introduce un minigioco Hunter
 - Selezione casuale dell'hunter, conversione dei runner colpiti e riporto automatico in lobby al termine della partita.
 - Possibilità di ricaricare la configurazione senza riavviare il server.
 
+Per una lista completa delle feature pianificate (inclusi ruoli avanzati, abilità, power-up, statistiche e strumenti amministrativi) fai riferimento alla [TinyHunt Game Design Specification](docs/design/tinyhunt-game-design.md). Il documento funge da checklist ufficiale: ogni sezione corrisponde a un blocco di sviluppo e indica anche le dipendenze tecniche suggerite.
+
 ## Requisiti
 - Server Paper o compatibile con API 1.20.
 - Permessi Bukkit per gestire i comandi (`tinyhunt.play`, `tinyhunt.admin`).

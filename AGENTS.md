@@ -13,3 +13,5 @@
 
 # Notes
 - Il README nella root documenta flusso di gioco, comandi e parametri del plugin TinyHunt.
+- Il documento `docs/design/tinyhunt-game-design.md` contiene la checklist completa delle feature richieste (ruoli, abilità, power-up, QoL, roadmap). Aggiornalo quando implementi nuove parti del gioco.
+- Mantieni questo file aggiornato con link utili o convenzioni scoperte durante lo sviluppo per velocizzare il lavoro futuro.
