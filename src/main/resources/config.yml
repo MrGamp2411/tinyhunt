@@ -1,0 +1,63 @@
+players:
+  min: 2
+  max: 10
+
+# Timing values expressed in seconds.
+timers:
+  auto-start-seconds: 120
+  hunter-selection-seconds: 10
+  game-duration-seconds: 600
+
+scales:
+  runner: 0.33
+  hunter: 1.0
+
+areas:
+  lobby: {}
+  arena: {}
+
+arena-spawns: {}
+
+messages:
+  command-help: |
+    &6TinyHunt Commands:
+    &e/tinyhunt join&7 - Enter the queue.
+    &e/tinyhunt leave&7 - Leave the queue or game.
+    &e/tinyhunt lobby setpos1|setpos2&7 - Define lobby corners.
+    &e/tinyhunt arena setpos1|setpos2|addspawn&7 - Configure the arena.
+    &e/tinyhunt start&7 - Force start when ready.
+    &e/tinyhunt stop&7 - Stop the current match.
+  unknown-subcommand: "&cComando sconosciuto. Usa &e/tinyhunt&c per aiuto."
+  player-only: "&cSolo i giocatori possono usare questo comando."
+  no-permission: "&cNon hai il permesso per farlo."
+  cannot-join: "&cNon puoi unirti ora, la partita è già in corso."
+  already-queued: "&eSei già in coda."
+  queue-full: "&cLa coda è piena."
+  joined-queue: "&aEntrato in coda! Posizione: &e%position%&a."
+  left-queue: "&eHai lasciato la coda."
+  not-in-queue: "&cNon sei in coda."
+  countdown-start: "&aNumero minimo raggiunto! Avvio tra &e%seconds% &asecondi."
+  countdown-tick: "&eLa partita inizia tra &6%seconds% &esecondi."
+  countdown-cancelled: "&cConto alla rovescia annullato: giocatori insufficienti."
+  not-enough-players: "&cServono più giocatori per iniziare la partita."
+  configuration-missing: "&cConfigura lobby, arena e spawn prima di avviare il gioco."
+  game-start: "&aLa partita è iniziata!"
+  already-running: "&eUna partita è già in corso."
+  hunter-selected: "&c%player% &eè diventato l'Hunter!"
+  you-are-hunter: "&cSei l'Hunter! Caccia tutti i runner."
+  now-hunter: "&cSei stato trasformato in Hunter!"
+  runner-converted: "&c%player% &eè stato convertito in Hunter."
+  hunters-win: "&cGli Hunter hanno eliminato tutti i Runner!"
+  runners-win: "&aI Runner hanno resistito abbastanza a lungo!"
+  manual-stop: "&eLa partita è stata fermata manualmente."
+  start-requested: "&aRichiesta di avvio forzato inviata."
+  stop-requested: "&eRichiesta di stop inviata."
+  no-active-game: "&cNon c'è nessuna partita da fermare."
+  reloaded: "&aConfigurazione ricaricata."
+  usage-lobby: "&eUsa: /tinyhunt lobby setpos1|setpos2"
+  usage-arena: "&eUsa: /tinyhunt arena setpos1|setpos2|addspawn"
+  lobby-pos-set: "&aAngolo &e%corner% &adella lobby salvato."
+  arena-pos-set: "&aAngolo &e%corner% &adell'arena salvato."
+  arena-spawn-added: "&aSpawn dell'arena aggiunto."
+  game-start-runner: "&aSei un Runner! Sopravvivi agli Hunter."
+  player-left: "&e%player% ha lasciato la partita."

@@ -1,7 +1,20 @@
 name: TinyHunt
 main: com.example.tinyhunt.TinyHuntPlugin
-version: 0.0.1
+version: 0.1.0
 api-version: "1.20"
 authors:
   - TinyHunt Team
-description: Base structure for the TinyHunt Paper plugin.
+description: Multiplayer Hunter vs Runner minigame with configurable lobby and arena.
+commands:
+  tinyhunt:
+    description: Gestisce il minigioco TinyHunt.
+    usage: /<command>
+    aliases: [th]
+    permission: tinyhunt.play
+permissions:
+  tinyhunt.play:
+    description: Permette di usare /tinyhunt join e /tinyhunt leave.
+    default: true
+  tinyhunt.admin:
+    description: Permette di configurare e avviare TinyHunt.
+    default: op
