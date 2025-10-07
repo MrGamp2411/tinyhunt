@@ -6,8 +6,12 @@ TinyHunt è un plugin Paper per Minecraft 1.20 che introduce un minigioco Hunter
 - Coda automatica con avvio del match quando viene raggiunto il numero minimo di giocatori configurato.
 - Gestione completa delle fasi del gioco (attesa, conto alla rovescia, partita, chiusura) con messaggi personalizzabili.
 - Configurazione della lobby, dell'arena e degli spawn direttamente in gioco tramite `/tinyhunt`.
-- Selezione casuale dell'hunter, conversione dei runner colpiti e riporto automatico in lobby al termine della partita.
+- Selezione casuale dell'hunter, conversione differita dei runner colpiti con respawn temporizzato e breve invulnerabilità.
+- Modalità Sudden Death automatica negli ultimi minuti con ping periodico dei runner e potenziamento degli hunter.
+- HUD dedicato con bossbar del tempo rimanente e scoreboard live (runner/hunter attivi, prossimo ping).
 - Possibilità di ricaricare la configurazione senza riavviare il server.
+
+Per una lista completa delle feature pianificate (inclusi ruoli avanzati, abilità, power-up, statistiche e strumenti amministrativi) fai riferimento alla [TinyHunt Game Design Specification](docs/design/tinyhunt-game-design.md). Il documento funge da checklist ufficiale: ogni sezione corrisponde a un blocco di sviluppo e indica anche le dipendenze tecniche suggerite.
 
 ## Requisiti
 - Server Paper o compatibile con API 1.20.
@@ -50,7 +54,11 @@ All'interno di `config.yml` puoi regolare:
 - `timers.auto-start-seconds`: tempo di attesa prima dell'avvio automatico dopo aver raggiunto il minimo di giocatori.
 - `timers.hunter-selection-seconds`: ritardo prima della scelta casuale dell'hunter.
 - `timers.game-duration-seconds`: durata totale del match.
+- `timers.runner-respawn-seconds`: quanti secondi passano prima che un runner eliminato torni come hunter.
+- `timers.respawn-invulnerability-seconds`: invulnerabilità concessa al nuovo hunter dopo il respawn.
 - `scales.runner` / `scales.hunter`: scala del modello dei giocatori runner/hunter (richiede server con attributo `GENERIC_SCALE`).
+- Sezione `sudden-death.*`: impostazioni per i ping finali (momento di attivazione, intervallo, durata reveal, speed degli hunter).
+- Sezione `hud.*`: testi mostrati in bossbar/scoreboard durante la partita.
 - Sezioni `messages.*`: testi mostrati al giocatore, con supporto ai codici colore `&` e placeholder come `%player%` o `%seconds%`.
 
 ## Build dal sorgente
