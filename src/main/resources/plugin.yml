@@ -11,6 +11,9 @@ commands:
     usage: /<command>
     aliases: [th]
     permission: tinyhunt.play
+  p:
+    description: Chat di party
+    usage: /p <messaggio>
 permissions:
   tinyhunt.play:
     description: Permette di usare /tinyhunt join e /tinyhunt leave.
