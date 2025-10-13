@@ -1,7 +1,10 @@
 package com.example.tinyhunt;
 
 import com.example.tinyhunt.command.TinyHuntCommand;
+import com.example.tinyhunt.game.ArenaBoundaryListener;
+import com.example.tinyhunt.game.ArenaSetupListener;
 import com.example.tinyhunt.game.GameManager;
+import com.example.tinyhunt.game.JoinMenuListener;
 import com.example.tinyhunt.game.PlayerListener;
 import com.kjaza.tinymmo.party.PartyChatCommand;
 import com.kjaza.tinymmo.party.PartyChatListener;
@@ -46,6 +49,9 @@ public final class TinyHuntPlugin extends JavaPlugin {
         command.setExecutor(tinyHuntCommand);
         command.setTabCompleter(tinyHuntCommand);
         getServer().getPluginManager().registerEvents(new PlayerListener(gameManager), this);
+        getServer().getPluginManager().registerEvents(new ArenaSetupListener(gameManager), this);
+        getServer().getPluginManager().registerEvents(new ArenaBoundaryListener(gameManager), this);
+        getServer().getPluginManager().registerEvents(new JoinMenuListener(gameManager), this);
         getServer().getPluginManager().registerEvents(
                 new SkillListener(skillManager, cooldownManager, resourceManager, visualCooldowns, this),
                 this);

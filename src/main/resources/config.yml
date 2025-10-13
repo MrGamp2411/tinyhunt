@@ -23,19 +23,22 @@ scales:
 
 areas:
   lobby: {}
-  arena: {}
 
-arena-spawns: {}
+arenas: {}
+
+active-arena: ""
 
 messages:
   command-help: |
-    &6TinyHunt Commands:
-    &e/tinyhunt join&7 - Enter the queue.
-    &e/tinyhunt leave&7 - Leave the queue or game.
-    &e/tinyhunt lobby setpos1|setpos2&7 - Define lobby corners.
-    &e/tinyhunt arena setpos1|setpos2|addspawn&7 - Configure the arena.
-    &e/tinyhunt start&7 - Force start when ready.
-    &e/tinyhunt stop&7 - Stop the current match.
+    &6Comandi TinyHunt:
+    &e/tinyhunt join&7 - Apri il menu della lobby.
+    &e/tinyhunt leave&7 - Lascia la coda o la partita.
+    &e/tinyhunt lobby setpos1|setpos2&7 - Definisci gli angoli della lobby.
+    &e/tinyhunt arena create&7 - Avvia la creazione di una nuova arena.
+    &e/tinyhunt arena set <nome>&7 - Ricevi la wand per delimitare l'arena.
+    &e/tinyhunt arena spawn <nome>&7 - Aggiungi uno spawn all'arena.
+    &e/tinyhunt start&7 - Forza l'avvio quando pronto.
+    &e/tinyhunt stop&7 - Ferma la partita in corso.
   unknown-subcommand: "&cComando sconosciuto. Usa &e/tinyhunt&c per aiuto."
   player-only: "&cSolo i giocatori possono usare questo comando."
   no-permission: "&cNon hai il permesso per farlo."
@@ -67,14 +70,43 @@ messages:
   no-active-game: "&cNon c'è nessuna partita da fermare."
   reloaded: "&aConfigurazione ricaricata."
   usage-lobby: "&eUsa: /tinyhunt lobby setpos1|setpos2"
-  usage-arena: "&eUsa: /tinyhunt arena setpos1|setpos2|addspawn"
+  usage-arena: "&eUsa: /tinyhunt arena create|set <nome>|spawn <nome>"
   lobby-pos-set: "&aAngolo &e%corner% &adella lobby salvato."
-  arena-pos-set: "&aAngolo &e%corner% &adell'arena salvato."
-  arena-spawn-added: "&aSpawn dell'arena aggiunto."
+  arena-pos-set: "&aArena &e%arena%&a: angolo &e%corner% &asalvato."
+  arena-spawn-added: "&aSpawn aggiunto all'arena &e%arena%&a."
+  arena-name-prompt: "&eScrivi in chat il nome della nuova arena (verrà normalizzato)."
+  arena-name-invalid: "&cNome arena non valido. Usa lettere, numeri, trattini o underscore."
+  arena-name-exists: "&cEsiste già un'arena chiamata &e%arena%&c."
+  arena-created: "&aArena &e%arena%&a creata! Usa &e/tinyhunt arena set %arena% &aper definirla."
+  arena-not-found: "&cNessuna arena trovata con nome &e%arena%&c."
+  arena-wand-received: "&aHai ricevuto la wand per l'arena &e%arena%&a. Click sinistro = Pos1, destro = Pos2."
+  arena-boundary-hit: "&cNon puoi uscire dall'arena!"
   game-start-runner: "&aSei un Runner! Sopravvivi agli Hunter."
   player-left: "&e%player% ha lasciato la partita."
   sudden-death-start: "&cSudden death! I runner saranno rivelati periodicamente."
   sudden-death-reveal: "&dPing dei runner attivo per &e%seconds%s&d!"
+
+  state:
+    waiting: "In attesa"
+    countdown: "Countdown"
+    running: "In corso"
+    ending: "Fine partita"
+
+  menu-title: "&6TinyHunt &7Lobby"
+  menu-status-name: "&eStato lobby"
+  menu-status-state: "&7Stato: &e%state%"
+  menu-status-queue: "&7In coda: &a%queue%&7/&a%max%"
+  menu-status-participants: "&7In partita: &c%participants%"
+  menu-status-arena: "&7Arena attiva: &e%arena%"
+  menu-no-arena: "Nessuna"
+  menu-join-available: "&aEntra in coda"
+  menu-join-available-lore: "&7Clicca per partecipare alla prossima partita."
+  menu-join-leave: "&cLascia la coda"
+  menu-join-leave-lore: "&7Clicca per uscire dalla coda."
+  menu-join-locked: "&cPartita in corso"
+  menu-join-locked-lore: "&7Attendi che la partita finisca."
+  menu-join-full: "&cCoda piena"
+  menu-join-full-lore: "&7Aspetta che si liberi un posto."
 
 hud:
   scoreboard-title: "TinyHunt"
