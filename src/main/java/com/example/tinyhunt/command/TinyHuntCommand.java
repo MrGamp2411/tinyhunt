@@ -58,7 +58,7 @@ public final class TinyHuntCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(plugin.getMessage("messages.no-permission"));
             return;
         }
-        gameManager.enqueue(player);
+        gameManager.getJoinMenu().open(player);
     }
 
     private void handleLeave(CommandSender sender) {
@@ -150,20 +150,42 @@ public final class TinyHuntCommand implements CommandExecutor, TabCompleter {
             return;
         }
         switch (args[1].toLowerCase(Locale.ROOT)) {
-            case "setpos1" -> {
-                gameManager.saveArenaCorner(player.getLocation(), true);
-                sender.sendMessage(plugin.getMessage("messages.arena-pos-set", Map.of("corner", 1)));
-            }
-            case "setpos2" -> {
-                gameManager.saveArenaCorner(player.getLocation(), false);
-                sender.sendMessage(plugin.getMessage("messages.arena-pos-set", Map.of("corner", 2)));
-            }
-            case "addspawn" -> {
-                gameManager.addArenaSpawn(player.getLocation());
-                sender.sendMessage(plugin.getMessage("messages.arena-spawn-added"));
-            }
+            case "create" -> handleArenaCreate(player);
+            case "set" -> handleArenaSet(player, args);
+            case "spawn" -> handleArenaSpawn(player, args);
             default -> sender.sendMessage(plugin.getMessage("messages.usage-arena"));
         }
+    }
+
+    private void handleArenaCreate(Player player) {
+        gameManager.getArenaSetupManager().requestArenaName(player);
+    }
+
+    private void handleArenaSet(Player player, String[] args) {
+        if (args.length < 3) {
+            player.sendMessage(plugin.getMessage("messages.usage-arena"));
+            return;
+        }
+        String arenaName = args[2].toLowerCase(Locale.ROOT);
+        if (!gameManager.arenaExists(arenaName)) {
+            player.sendMessage(plugin.getMessage("messages.arena-not-found", Map.of("arena", arenaName)));
+            return;
+        }
+        gameManager.setActiveArena(arenaName);
+        gameManager.getArenaSetupManager().beginEditing(player, arenaName);
+    }
+
+    private void handleArenaSpawn(Player player, String[] args) {
+        if (args.length < 3) {
+            player.sendMessage(plugin.getMessage("messages.usage-arena"));
+            return;
+        }
+        String arenaName = args[2].toLowerCase(Locale.ROOT);
+        if (!gameManager.addArenaSpawn(arenaName, player.getLocation())) {
+            player.sendMessage(plugin.getMessage("messages.arena-not-found", Map.of("arena", arenaName)));
+            return;
+        }
+        player.sendMessage(plugin.getMessage("messages.arena-spawn-added", Map.of("arena", arenaName)));
     }
 
     @Override
@@ -184,7 +206,14 @@ public final class TinyHuntCommand implements CommandExecutor, TabCompleter {
                 return partialMatches(args[1], Arrays.asList("setpos1", "setpos2"));
             }
             if ("arena".equalsIgnoreCase(args[0]) && sender.hasPermission("tinyhunt.admin")) {
-                return partialMatches(args[1], Arrays.asList("setpos1", "setpos2", "addspawn"));
+                return partialMatches(args[1], Arrays.asList("create", "set", "spawn"));
+            }
+        }
+        if (args.length == 3) {
+            if ("arena".equalsIgnoreCase(args[0]) && sender.hasPermission("tinyhunt.admin")) {
+                if ("set".equalsIgnoreCase(args[1]) || "spawn".equalsIgnoreCase(args[1])) {
+                    return partialMatches(args[2], gameManager.getArenaNames());
+                }
             }
         }
         return Collections.emptyList();

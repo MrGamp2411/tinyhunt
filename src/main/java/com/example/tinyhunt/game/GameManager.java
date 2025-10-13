@@ -1,12 +1,13 @@
 package com.example.tinyhunt.game;
 
 import com.example.tinyhunt.TinyHuntPlugin;
-import com.example.tinyhunt.model.ConfigLocationUtil;
+import com.example.tinyhunt.model.ArenaDefinition;
 import com.example.tinyhunt.model.ConfiguredArea;
 import com.example.tinyhunt.model.PlayerRole;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -36,8 +37,8 @@ public final class GameManager {
 
     private final TinyHuntPlugin plugin;
     private ConfiguredArea lobbyArea;
-    private ConfiguredArea arenaArea;
-    private final List<Location> arenaSpawns = new ArrayList<>();
+    private final Map<String, ArenaDefinition> arenas = new LinkedHashMap<>();
+    private String activeArenaName;
 
     private final LinkedHashSet<UUID> queue = new LinkedHashSet<>();
     private final LinkedHashSet<UUID> activePlayers = new LinkedHashSet<>();
@@ -46,6 +47,8 @@ public final class GameManager {
     private final Map<UUID, GameMode> storedModes = new HashMap<>();
 
     private final MatchHud matchHud;
+    private final JoinMenu joinMenu;
+    private final ArenaSetupManager arenaSetupManager;
 
     private GameState state = GameState.WAITING;
     private BukkitTask countdownTask;
@@ -79,6 +82,8 @@ public final class GameManager {
     public GameManager(TinyHuntPlugin plugin) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.matchHud = new MatchHud(plugin);
+        this.joinMenu = new JoinMenu(plugin, this);
+        this.arenaSetupManager = new ArenaSetupManager(plugin, this);
         reloadSettings();
     }
 
@@ -104,15 +109,27 @@ public final class GameManager {
         hunterScale = (float) plugin.getConfig().getDouble("scales.hunter", 1.0D);
 
         lobbyArea = ConfiguredArea.load(plugin.getConfig().getConfigurationSection("areas.lobby"));
-        arenaArea = ConfiguredArea.load(plugin.getConfig().getConfigurationSection("areas.arena"));
 
-        arenaSpawns.clear();
-        arenaSpawns.addAll(ConfigLocationUtil
-                .readLocationList(plugin.getConfig().getConfigurationSection("arena-spawns")));
+        arenas.clear();
+        ConfigurationSection arenasSection = plugin.getConfig().getConfigurationSection("arenas");
+        if (arenasSection != null) {
+            for (String key : arenasSection.getKeys(false)) {
+                ArenaDefinition definition = ArenaDefinition.load(key, arenasSection.getConfigurationSection(key));
+                arenas.put(key, definition);
+            }
+        }
+        activeArenaName = plugin.getConfig().getString("active-arena");
+        if (activeArenaName == null || !arenas.containsKey(activeArenaName)) {
+            activeArenaName = arenas.keySet().stream().findFirst().orElse(null);
+        }
     }
 
     public GameState getState() {
         return state;
+    }
+
+    public TinyHuntPlugin getPlugin() {
+        return plugin;
     }
 
     public int getMinPlayers() {
@@ -127,20 +144,39 @@ public final class GameManager {
         return lobbyArea;
     }
 
-    public ConfiguredArea getArenaArea() {
-        return arenaArea;
+    public JoinMenu getJoinMenu() {
+        return joinMenu;
     }
 
-    public List<Location> getArenaSpawns() {
-        return new ArrayList<>(arenaSpawns);
+    public ArenaSetupManager getArenaSetupManager() {
+        return arenaSetupManager;
+    }
+
+    public Optional<ArenaDefinition> getActiveArena() {
+        if (activeArenaName == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(arenas.get(activeArenaName));
+    }
+
+    public List<String> getArenaNames() {
+        return new ArrayList<>(arenas.keySet());
     }
 
     public boolean isInQueue(Player player) {
         return queue.contains(player.getUniqueId());
     }
 
+    public int getQueueSize() {
+        return queue.size();
+    }
+
     public boolean isParticipant(Player player) {
         return activePlayers.contains(player.getUniqueId());
+    }
+
+    public int getParticipantCount() {
+        return activePlayers.size();
     }
 
     public boolean isHunter(Player player) {
@@ -407,15 +443,18 @@ public final class GameManager {
     }
 
     private void teleportToArena(Player player) {
-        Location target = pickArenaSpawn().orElseGet(() -> arenaArea.getRandomLocation());
+        ArenaDefinition arena = getActiveArena()
+                .orElseThrow(() -> new IllegalStateException("Active arena not configured"));
+        Location target = pickArenaSpawn(arena).orElseGet(() -> arena.getArea().getRandomLocation());
         player.teleport(target);
     }
 
-    private Optional<Location> pickArenaSpawn() {
-        if (arenaSpawns.isEmpty()) {
+    private Optional<Location> pickArenaSpawn(ArenaDefinition arena) {
+        List<Location> spawns = arena.getSpawns();
+        if (spawns.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(arenaSpawns.get(ThreadLocalRandom.current().nextInt(arenaSpawns.size())));
+        return Optional.of(spawns.get(ThreadLocalRandom.current().nextInt(spawns.size())));
     }
 
     private void teleportToLobby(Player player) {
@@ -478,8 +517,12 @@ public final class GameManager {
     }
 
     private boolean validateConfiguration() {
-        return lobbyArea != null && lobbyArea.isComplete() && arenaArea != null && arenaArea.isComplete()
-                && !arenaSpawns.isEmpty();
+        if (lobbyArea == null || !lobbyArea.isComplete()) {
+            return false;
+        }
+        return getActiveArena()
+                .filter(arena -> arena.getArea().isComplete() && !arena.getSpawns().isEmpty())
+                .isPresent();
     }
 
     public void cancelAllTasks() {
@@ -706,27 +749,59 @@ public final class GameManager {
         } else {
             lobbyArea.setPos2(location);
         }
-        persistAreas();
+        persistLobby();
     }
 
-    public void saveArenaCorner(Location location, boolean first) {
-        if (arenaArea == null) {
-            arenaArea = new ConfiguredArea();
+    public boolean saveArenaCorner(String arenaName, Location location, boolean first) {
+        ArenaDefinition arena = arenas.get(arenaName);
+        if (arena == null) {
+            return false;
         }
         if (first) {
-            arenaArea.setPos1(location);
+            arena.getArea().setPos1(location);
         } else {
-            arenaArea.setPos2(location);
+            arena.getArea().setPos2(location);
         }
-        persistAreas();
+        persistArenas();
+        return true;
     }
 
-    public void addArenaSpawn(Location location) {
-        arenaSpawns.add(location);
-        persistArenaSpawns();
+    public boolean addArenaSpawn(String arenaName, Location location) {
+        ArenaDefinition arena = arenas.get(arenaName);
+        if (arena == null) {
+            return false;
+        }
+        arena.addSpawn(location);
+        persistArenas();
+        return true;
     }
 
-    private void persistAreas() {
+    public boolean arenaExists(String arenaName) {
+        return arenas.containsKey(arenaName);
+    }
+
+    public boolean createArena(String arenaName) {
+        if (arenas.containsKey(arenaName)) {
+            return false;
+        }
+        arenas.put(arenaName, new ArenaDefinition(arenaName));
+        if (activeArenaName == null) {
+            activeArenaName = arenaName;
+        }
+        persistArenas();
+        return true;
+    }
+
+    public boolean setActiveArena(String arenaName) {
+        if (!arenas.containsKey(arenaName)) {
+            return false;
+        }
+        activeArenaName = arenaName;
+        persistArenas();
+        return true;
+    }
+
+    private void persistLobby() {
         ConfigurationSection areas = plugin.getConfig().getConfigurationSection("areas");
         if (areas == null) {
             areas = plugin.getConfig().createSection("areas");
@@ -735,25 +810,30 @@ public final class GameManager {
         if (lobbySection == null) {
             lobbySection = areas.createSection("lobby");
         }
-        ConfigurationSection arenaSection = areas.getConfigurationSection("arena");
-        if (arenaSection == null) {
-            arenaSection = areas.createSection("arena");
-        }
         if (lobbyArea != null) {
             lobbyArea.save(lobbySection);
-        }
-        if (arenaArea != null) {
-            arenaArea.save(arenaSection);
         }
         plugin.saveConfig();
     }
 
-    private void persistArenaSpawns() {
-        ConfigurationSection spawns = plugin.getConfig().getConfigurationSection("arena-spawns");
-        if (spawns == null) {
-            spawns = plugin.getConfig().createSection("arena-spawns");
+    private void persistArenas() {
+        ConfigurationSection arenasSection = plugin.getConfig().getConfigurationSection("arenas");
+        if (arenasSection == null) {
+            arenasSection = plugin.getConfig().createSection("arenas");
         }
-        ConfigLocationUtil.writeLocationList(spawns, arenaSpawns);
+        for (String key : new ArrayList<>(arenasSection.getKeys(false))) {
+            arenasSection.set(key, null);
+        }
+        for (ArenaDefinition arena : arenas.values()) {
+            ConfigurationSection section = arenasSection.createSection(arena.getName());
+            arena.save(section);
+        }
+        plugin.getConfig().set("active-arena", activeArenaName);
+        ConfigurationSection areas = plugin.getConfig().getConfigurationSection("areas");
+        if (areas != null) {
+            areas.set("arena", null);
+        }
+        plugin.getConfig().set("arena-spawns", null);
         plugin.saveConfig();
     }
 

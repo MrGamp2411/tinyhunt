@@ -82,6 +82,38 @@ public final class ConfiguredArea {
         return new Location(getWorld(), x, y, z);
     }
 
+    public boolean contains(Location location) {
+        if (!isComplete() || location == null) {
+            return false;
+        }
+        if (location.getWorld() == null || !location.getWorld().equals(getWorld())) {
+            return false;
+        }
+        Vector min = getMinimum();
+        Vector max = getMaximum();
+        double x = location.getX();
+        double y = location.getY();
+        double z = location.getZ();
+        return x >= min.getX() && x <= max.getX()
+                && y >= min.getY() && y <= max.getY()
+                && z >= min.getZ() && z <= max.getZ();
+    }
+
+    public Location clamp(Location location) {
+        if (!isComplete() || location == null) {
+            throw new IllegalStateException("Area is not fully configured");
+        }
+        if (location.getWorld() == null || !location.getWorld().equals(getWorld())) {
+            return getCenter();
+        }
+        Vector min = getMinimum();
+        Vector max = getMaximum();
+        double x = Math.max(min.getX(), Math.min(max.getX(), location.getX()));
+        double y = Math.max(min.getY(), Math.min(max.getY(), location.getY()));
+        double z = Math.max(min.getZ(), Math.min(max.getZ(), location.getZ()));
+        return new Location(getWorld(), x, y, z, location.getYaw(), location.getPitch());
+    }
+
     public void save(ConfigurationSection section) {
         Objects.requireNonNull(section, "section");
         if (!isComplete()) {
